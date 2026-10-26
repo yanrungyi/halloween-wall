@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>萬聖節閃光牆</title>
+<meta name="application-name" content="萬聖節閃光牆">
+<meta name="apple-mobile-web-app-title" content="萬聖節閃光牆">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a0b2e">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" id="appleIcon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap" rel="stylesheet">
+<style>
+  :root { --glow: #ff8a2a; --bg: #1a0b2e; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+    touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  canvas#wall { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  #hint {
+    position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom));
+    transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+    padding: .5em 1.2em; border-radius: 999px;
+    background: rgba(10, 4, 20, .55); color: #fff;
+    font-size: clamp(18px, 4.6vmin, 32px); font-weight: 700; letter-spacing: .06em;
+    text-shadow: 0 0 10px var(--glow), 0 0 22px var(--glow);
+    box-shadow: 0 0 24px rgba(0,0,0,.35);
+    transition: opacity .9s ease; opacity: 1;
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  #hint.hide { opacity: 0; }
+  @keyframes bob { 0%,100% { margin-bottom: 0 } 50% { margin-bottom: 8px } }
+
+  #gear {
+    position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom));
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25);
+    background: rgba(20, 10, 35, .45); color: rgba(255,255,255,.85);
+    display: grid; place-items: center; cursor: pointer; padding: 0;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    opacity: .7; transition: opacity .2s;
+  }
+  #gear:hover, #gear[aria-expanded="true"] { opacity: 1; }
+  #gear svg { width: 26px; height: 26px; }
+
+  #panel {
+    position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(76px + env(safe-area-inset-bottom));
+    width: min(320px, calc(100vw - 32px)); max-height: calc(100% - 110px); overflow-y: auto;
+    box-sizing: border-box; padding: 16px 18px 18px; border-radius: 18px;
+    background: rgba(22, 12, 38, .88); color: #f4ecff;
+    border: 1px solid rgba(255,255,255,.15); box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    font-size: 15px; touch-action: pan-y;
+  }
+  #panel[hidden] { display: none; }
+  #panel h2 { margin: 0 0 12px; font-size: 17px; display: flex; justify-content: space-between; align-items: center; }
+  #panel .close { background: none; border: 0; color: inherit; font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  #panel .field { margin: 0 0 14px; }
+  #panel .label { display: flex; justify-content: space-between; margin-bottom: 6px; color: #d9c9f2; }
+  #panel .label span:last-child { color: #fff; font-variant-numeric: tabular-nums; }
+  #panel input[type="text"] {
+    width: 100%; box-sizing: border-box; padding: 9px 11px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; font-size: 16px;
+    -webkit-user-select: text; user-select: text;
+  }
+  #panel input[type="range"] { width: 100%; accent-color: var(--glow); }
+  .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .themes button {
+    border: 2px solid transparent; border-radius: 10px; padding: 6px 4px 5px; cursor: pointer;
+    background: rgba(255,255,255,.07); color: #fff; font-size: 13px;
+  }
+  .themes button i { display: block; height: 14px; border-radius: 6px; margin-bottom: 4px; }
+  .themes button[aria-pressed="true"] { border-color: #fff; background: rgba(255,255,255,.16); }
+  .switch { display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; cursor: pointer; }
+  .switch input { width: 22px; height: 22px; accent-color: var(--glow); }
+  .row { display: flex; gap: 8px; margin-top: 6px; }
+  .row button {
+    flex: 1; padding: 10px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.22);
+    background: rgba(255,255,255,.1); color: #fff; font-size: 15px; cursor: pointer;
+  }
+  #note { margin: 10px 0 0; font-size: 13px; color: #d9c9f2; min-height: 1em; }
+  #nogl { position: fixed; inset: 0; display: none; place-items: center; color: #fff; text-align: center; padding: 24px; font-size: 18px; }
+</style>
+</head>
+<body>
+<canvas id="wall"></canvas>
+<div id="hint">摸摸看，牆後藏了什麼？</div>
+<div id="nogl">這台裝置的瀏覽器不支援 WebGL，無法顯示閃光牆。</div>
+
+<button id="gear" aria-label="設定" aria-expanded="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<div id="panel" hidden>
+  <h2>設定 <button class="close" id="btnClose" aria-label="關閉">×</button></h2>
+  <div class="field">
+    <div class="label"><span>隱藏的文字</span></div>
+    <input type="text" id="optText" maxlength="24" autocomplete="off">
+  </div>
+  <div class="field">
+    <div class="label"><span>色系</span></div>
+    <div class="themes" id="themes"></div>
+  </div>
+  <div class="field">
+    <div class="label"><span>撥開範圍</span><span id="rangeVal"></span></div>
+    <input type="range" id="optRange" min="50" max="180" step="5">
+  </div>
+  <div class="field">
+    <div class="label"><span>恢復速度</span><span id="speedVal"></span></div>
+    <input type="range" id="optSpeed" min="1" max="18" step="1">
+  </div>
+  <label class="switch"><span>萬聖節圖示</span><input type="checkbox" id="optEmoji"></label>
+  <label class="switch"><span>閒置示範</span><input type="checkbox" id="optIdle"></label>
+  <div class="row">
+    <button id="btnFs">全螢幕</button>
+    <button id="btnReset">恢復預設</button>
+  </div>
+  <p id="note"></p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- 設定 ----------
+  const THEMES = {
+    halloween: { name: '萬聖節', bg: '#1a0b2e', c: ['#ff7a1a', '#8a3ffc', '#ffc94a', '#fff6e0'], glow: '#ff8a2a', text: '#ffe2c2' },
+    pink:      { name: '粉紅',   bg: '#2a0a1f', c: ['#ff5fa2', '#d63384', '#ffb3d1', '#ffffff'], glow: '#ff6fb5', text: '#ffe0ef' },
+    ice:       { name: '冰藍',   bg: '#06142a', c: ['#4cc9f0', '#4361ee', '#a0e7ff', '#ffffff'], glow: '#6fd3ff', text: '#e0f7ff' },
+    gold:      { name: '金色',   bg: '#1a1206', c: ['#ffc94a', '#e8a317', '#fff1b8', '#ffffff'], glow: '#ffcc55', text: '#fff4d6' },
+    mint:      { name: '薄荷',   bg: '#062420', c: ['#3ef0b5', '#18a999', '#a6ffe0', '#ffffff'], glow: '#5affc8', text: '#e0fff3' },
+    amethyst:  { name: '紫晶',   bg: '#160a2a', c: ['#9d4edd', '#5a189a', '#c77dff', '#f3e8ff'], glow: '#c77dff', text: '#f3e8ff' },
+  };
+  const DEFAULTS = { text: 'FUN ROBOT', theme: 'halloween', range: 100, speed: 13, emoji: true, idle: true };
+  const KEY = 'halloween-wall-settings-v1';
+  const EMOJIS = ['🎃','👻','🦇','🕷️','🍬','🍭','🍫','🕸️','🧙','🐈‍⬛','🌙','🧛','🔮','🧹','💀','🍄','⭐','🧟'];
+  const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  const IDLE_MS = 8000, SHUFFLE_MS = 30000, FADE_S = 1.5;
+
+  // 不支援 🐈‍⬛ 合成字的裝置會畫成「貓＋黑方塊」，這時就拿掉它
+  try {
+    const mc = document.createElement('canvas').getContext('2d');
+    mc.font = `40px ${EMOJI_FONT}`;
+    if (mc.measureText('🐈‍⬛').width > mc.measureText('🐈').width * 1.4) EMOJIS.splice(EMOJIS.indexOf('🐈‍⬛'), 1);
+  } catch (e) {}
+
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+      const out = Object.assign({}, DEFAULTS, s || {});
+      if (!THEMES[out.theme]) out.theme = DEFAULTS.theme;
+      return out;
+    } catch (e) { return Object.assign({}, DEFAULTS); }
+  }
+  function saveSettings() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  }
+  let S = loadSettings();
+  const recoverSec = () => (21 - S.speed) / 2;   // speed 13 → 4 秒
+
+  // ---------- WebGL ----------
+  const canvas = document.getElementById('wall');
+  const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+  if (!gl) { document.getElementById('nogl').style.display = 'grid'; return; }
+
+  const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+  const FS = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 u_res;
+uniform float u_dpr, u_time, u_mix;
+uniform sampler2D u_mask, u_texA, u_texB;
+uniform vec3 u_bg, u_c0, u_c1, u_c2, u_c3, u_glow;
+
+float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+vec2 hash22(vec2 p){ vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973)); p3+=dot(p3,p3.yzx+33.33); return fract((p3.xx+p3.yz)*p3.zy); }
+float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f);
+  return mix(mix(hash12(i),hash12(i+vec2(1.,0.)),u.x), mix(hash12(i+vec2(0.,1.)),hash12(i+vec2(1.,1.)),u.x), u.y); }
+float fbm(vec2 p){ float v=0., a=.5; for(int i=0;i<4;i++){ v+=a*vnoise(p); p=p*2.03+17.1; a*=.5; } return v; }
+vec3 pal(float h){ return h<.4 ? u_c0 : h<.8 ? u_c1 : h<.92 ? u_c2 : u_c3; }
+
+// 一層亮片：size 為格子大小（CSS px），density 為出現機率
+vec4 sequin(vec2 px, float size, float density, float seed){
+  vec2 g=px/size;
+  g.x+=mod(floor(g.y),2.)*.5;
+  vec2 id=floor(g), f=fract(g)-.5;
+  float h=hash12(id+seed);
+  if(h>density) return vec4(0.);
+  f-=(hash22(id+seed*1.7)-.5)*.22;
+  float d=length(f), rad=.47, aa=1.5/size;
+  float a=1.-smoothstep(rad-aa,rad,d);
+  float h2=hash12(id*1.31+seed+3.7), h3=hash12(id*.77+seed+9.1), h4=hash12(id*2.13+seed+1.3);
+  vec3 col=pal(h2);
+  float tw=pow(.5+.5*sin(u_time*(1.2+h3*3.5)+h3*60.),10.);
+  float tw2=.5+.5*sin(u_time*(.5+h4)+h4*30.);
+  vec2 L=normalize(hash22(id+seed*3.1)-.5+.001);
+  float shade=.55+.45*dot(f/rad,L);
+  float rim=smoothstep(rad,rad*.55,d);
+  vec3 c=col*(.22+.6*shade*(.55+.45*tw2))*(.7+.3*rim);
+  vec2 hl=L*rad*.35;
+  float spec=exp(-dot(f-hl,f-hl)*90.);
+  c+=col*tw*1.1+vec3(1.)*spec*(.2+1.7*tw);
+  return vec4(c,a);
+}
+
+void main(){
+  vec2 frag=gl_FragCoord.xy;
+  vec2 uv=vec2(frag.x/u_res.x, 1.-frag.y/u_res.y);
+  vec2 px=vec2(frag.x, u_res.y-frag.y)/u_dpr;
+  float ms=min(u_res.x,u_res.y)/u_dpr;
+
+  vec3 wall=u_bg*(.75+.5*vnoise(px/ms*3.+u_time*.03));
+  vec4 s;
+  s=sequin(px,26.,.97,11.);   wall=mix(wall,s.rgb,s.a);
+  s=sequin(px+7.,15.,.5,37.); wall=mix(wall,s.rgb,s.a);
+  s=sequin(px+3.,8.,.38,71.); wall=mix(wall,s.rgb,s.a);
+
+  vec3 col=wall;
+  float m=texture2D(u_mask,uv).r;
+  if(m>.003){
+    vec3 content=mix(texture2D(u_texA,uv).rgb, texture2D(u_texB,uv).rgb, u_mix);
+    float n=fbm(px/ms*7.+vec2(u_time*.12,-u_time*.09));
+    float shard=hash12(floor(px/5.)+7.);
+    float h=m*1.15+(n-.5)*.55+(shard-.5)*.12;
+    float reveal=smoothstep(.47,.53,h);
+    col=mix(wall,content,reveal);
+    float band=exp(-pow((h-.5)/.075,2.));
+    float glint=step(.72,hash12(floor(px/3.)+floor(u_time*10.)*1.37));
+    col+=band*(u_glow*(.5+.9*glint)+vec3(glint*.7));
+  }
+  gl_FragColor=vec4(col,1.);
+}`;
+
+  function compile(type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    return sh;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const aP = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(aP);
+  gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {};
+  ['u_res','u_dpr','u_time','u_mix','u_mask','u_texA','u_texB','u_bg','u_c0','u_c1','u_c2','u_c3','u_glow']
+    .forEach(n => U[n] = gl.getUniformLocation(prog, n));
+
+  function makeTex(unit) {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    return t;
+  }
+  // 每張 texture 固定綁一個 unit，之後不必再切換
+  const texMask = makeTex(0), texA = makeTex(1), texB = makeTex(2);
+  gl.uniform1i(U.u_mask, 0); gl.uniform1i(U.u_texA, 1); gl.uniform1i(U.u_texB, 2);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+  const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  function applyTheme() {
+    const t = THEMES[S.theme];
+    gl.uniform3fv(U.u_bg, hexRGB(t.bg));
+    t.c.forEach((c, i) => gl.uniform3fv(U['u_c' + i], hexRGB(c)));
+    gl.uniform3fv(U.u_glow, hexRGB(t.glow));
+    document.documentElement.style.setProperty('--glow', t.glow);
+    document.documentElement.style.setProperty('--bg', t.bg);
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', t.bg);
+  }
+
+  // ---------- 尺寸與遮罩網格 ----------
+  let dpr = 1, cw = 0, ch = 0, gw = 0, gh = 0;
+  let mask = new Float32Array(0), maskBytes = new Uint8Array(0), maskDirty = true;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    cw = window.innerWidth; ch = window.innerHeight;
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform2f(U.u_res, canvas.width, canvas.height);
+    gl.uniform1f(U.u_dpr, dpr);
+    gw = Math.ceil(cw / 6); gh = Math.ceil(ch / 6);
+    mask = new Float32Array(gw * gh); maskBytes = new Uint8Array(gw * gh);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, gw, gh, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, maskBytes);
+    maskDirty = false;
+    redrawCurrent();
+  }
+
+  // ---------- 牆後的內容（兩張 texture 交替淡入淡出）----------
+  const layers = [document.createElement('canvas'), document.createElement('canvas')];
+  let mixPos = 0, mixFrom = 0, mixTo = 0, fadeT = -1;
+
+  const rgba = (hex, a) => { const [r, g, b] = hexRGB(hex); return `rgba(${r * 255 | 0},${g * 255 | 0},${b * 255 | 0},${a})`; };
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+
+  function dotify(text) {
+    return text.trim().split(/\s+/).filter(Boolean)
+      .map(w => /^[A-Za-z0-9]+$/.test(w) ? w.split('').join('.') : w);
+  }
+
+  function drawContent(idx) {
+    const cv = layers[idx];
+    const W = cv.width = canvas.width, H = cv.height = canvas.height;
+    const ctx = cv.getContext('2d');
+    const t = THEMES[S.theme];
+    const minSide = Math.min(W, H);
+
+    // 發光背景
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    let g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.hypot(W, H) * .55);
+    g.addColorStop(0, rgba(t.glow, .55)); g.addColorStop(.45, rgba(t.c[1], .35)); g.addColorStop(1, rgba(t.bg, 1));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${rand(.15, .6)})`;
+      ctx.beginPath(); ctx.arc(rand(0, W), rand(0, H), rand(.6, 1.8) * dpr, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 文字
+    const words = dotify(S.text || DEFAULTS.text);
+    const portrait = H > W * 1.05;
+    const lines = portrait ? words : [words.join(' ')];
+    const fontOf = px => `${px}px Michroma, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
+    ctx.font = fontOf(100);
+    const maxW = Math.max(1, ...lines.map(l => ctx.measureText(l).width));
+    let fs = Math.min(W * .84 * 100 / maxW, H * (portrait ? .5 : .32) / (lines.length * 1.3), minSide * .24);
+    fs = Math.max(12, Math.floor(fs));
+    const lh = fs * 1.3;
+    ctx.font = fontOf(fs);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const textW = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const textH = lh * lines.length;
+    const y0 = H / 2 - textH / 2 + lh / 2;
+    const box = { x: W / 2 - textW / 2, y: H / 2 - textH / 2, w: textW, h: textH };
+    const drawText = () => lines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + i * lh));
+    ctx.fillStyle = t.text;
+    ctx.shadowColor = t.glow;
+    ctx.shadowBlur = fs * .9; drawText();
+    ctx.shadowBlur = fs * .35; drawText();
+    ctx.shadowBlur = fs * .1; ctx.fillStyle = '#fff'; drawText();
+    ctx.shadowBlur = 0;
+
+    // 萬聖節圖示
+    if (S.emoji) {
+      const phone = Math.min(cw, ch) < 600;
+      const count = phone ? randInt(12, 20) : randInt(28, 40);
+      let base = minSide * (phone ? .12 : .09);
+      const pad = fs * .25;
+      const bag = [];
+      const placed = [];
+      for (let tries = 0; placed.length < count && tries < 5000; tries++) {
+        if (tries && tries % 900 === 0) base *= .88;
+        const s = base * rand(.65, 1.25), r = s * .62;
+        if (W < 2 * r || H < 2 * r) continue;
+        const x = rand(r, W - r), y = rand(r, H - r);
+        if (x + r > box.x - pad && x - r < box.x + box.w + pad && y + r > box.y - pad && y - r < box.y + box.h + pad) continue;
+        if (placed.some(p => Math.hypot(p.x - x, p.y - y) < p.r + r + 4 * dpr)) continue;
+        if (!bag.length) bag.push(...EMOJIS.slice().sort(() => Math.random() - .5));
+        placed.push({ x, y, r, s, a: rand(-.55, .55), e: bag.pop() });
+      }
+      for (const p of placed) {
+        ctx.save();
+        ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.font = `${Math.round(p.s)}px ${EMOJI_FONT}`;
+        ctx.shadowColor = t.glow;
+        ctx.shadowBlur = p.s * .5; ctx.fillText(p.e, 0, 0);
+        ctx.shadowBlur = p.s * .15; ctx.fillText(p.e, 0, 0);
+        ctx.restore();
+      }
+    }
+
+    gl.activeTexture(gl.TEXTURE1 + idx);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+  }
+
+  // 立即重畫目前顯示中的那張（設定改變或旋轉螢幕時）
+  function redrawCurrent() {
+    if (!cw) return;
+    const idx = mixTo;
+    fadeT = -1; mixPos = mixTo;
+    drawContent(idx);
+  }
+  // 換一批圖示：畫在另一張，再淡入
+  function shuffle() {
+    const next = mixTo === 0 ? 1 : 0;
+    drawContent(next);
+    mixFrom = mixPos; mixTo = next; fadeT = 0;
+  }
+
+  // ---------- 觸碰 ----------
+  const pointers = new Map();
+  let lastInteract = performance.now(), touchedOnce = false;
+  const hint = document.getElementById('hint');
+
+  function onDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    closePanel();
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, dwell: 0 });
+    lastInteract = performance.now();
+    if (!touchedOnce) touchedOnce = true;
+    hint.classList.add('hide');
+    walker = null;
+    requestWake();
+  }
+  function onMove(e) {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    p.x = e.clientX; p.y = e.clientY;
+    lastInteract = performance.now();
+  }
+  function onUp(e) { pointers.delete(e.pointerId); lastInteract = performance.now(); }
+  canvas.addEventListener('pointerdown', onDown);
+  canvas.addEventListener('pointermove', onMove);
+  canvas.addEventListener('pointerup', onUp);
+  canvas.addEventListener('pointercancel', onUp);
+  canvas.addEventListener('lostpointercapture', onUp);
+
+  // 禁止捲動、縮放、長按選單
+  const inPanel = el => el && el.closest && el.closest('#panel');
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('touchmove', e => { if (!inPanel(e.target)) e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault());
+  document.addEventListener('selectstart', e => { if (!inPanel(e.target)) e.preventDefault(); });
+
+  function baseRadius() { return Math.min(cw, ch) * .12 * S.range / 100; }
+
+  function stamp(x, y, r) {
+    const gx = x / 6, gy = y / 6, gr = r / 6;
+    const x0 = Math.max(0, Math.floor(gx - gr)), x1 = Math.min(gw - 1, Math.ceil(gx + gr));
+    const y0 = Math.max(0, Math.floor(gy - gr)), y1 = Math.min(gh - 1, Math.ceil(gy + gr));
+    for (let yy = y0; yy <= y1; yy++) {
+      const dy = yy + .5 - gy, row = yy * gw;
+      for (let xx = x0; xx <= x1; xx++) {
+        const dx = xx + .5 - gx;
+        const d = Math.sqrt(dx * dx + dy * dy) / gr;
+        if (d >= 1) continue;
+        let v = d < .55 ? 1 : 1 - (d - .55) / .45;
+        v = v * v * (3 - 2 * v);
+        const i = row + xx;
+        if (v > mask[i]) mask[i] = v;
+      }
+    }
+  }
+  function stampSegment(ax, ay, bx, by, r) {
+    const dist = Math.hypot(bx - ax, by - ay);
+    const steps = Math.max(1, Math.ceil(dist / (r * .3)));
+    for (let k = 1; k <= steps; k++) stamp(ax + (bx - ax) * k / steps, ay + (by - ay) * k / steps, r);
+  }
+
+  // ---------- 閒置示範 ----------
+  let walker = null;
+  function walkerPos(t) {
+    return [
+      cw * (.5 + .33 * Math.sin(t * .41) + .08 * Math.sin(t * 1.13 + 2)),
+      ch * (.5 + .28 * Math.sin(t * .29 + 1) + .08 * Math.sin(t * .97)),
+    ];
+  }
+
+  // ---------- Wake Lock ----------
+  let wakeLock = null;
+  async function requestWake() {
+    if (wakeLock || !('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && touchedOnce) requestWake();
+  });
+
+  // ---------- 主迴圈 ----------
+  let last = performance.now();
+  const t0 = last;
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000);
+    last = now;
+
+    // 線性衰減（在 Float32 中進行，不會卡在 8-bit）
+    const dec = dt / recoverSec();
+    let any = false;
+    for (let i = 0; i < mask.length; i++) {
+      const v = mask[i];
+      if (v > 0) { mask[i] = v > dec ? v - dec : 0; any = true; }
+    }
+
+    // 手指
+    const br = baseRadius();
+    pointers.forEach(p => {
+      const moved = Math.hypot(p.x - p.lx, p.y - p.ly);
+      if (moved < 120 * dt) p.dwell += dt; else p.dwell = Math.max(0, p.dwell - dt * 3);
+      const k = Math.min(1, p.dwell / 3);
+      const r = br * (1 + .6 * k * k * (3 - 2 * k));
+      stampSegment(p.lx, p.ly, p.x, p.y, r);
+      p.lx = p.x; p.ly = p.y;
+      any = true;
+    });
+
+    // 閒置
+    const idle = pointers.size === 0 && now - lastInteract > IDLE_MS;
+    if (idle) {
+      hint.classList.remove('hide');
+      if (S.idle) {
+        const wt = (now - t0) / 1000;
+        const [x, y] = walkerPos(wt);
+        if (!walker) walker = { x, y };
+        stampSegment(walker.x, walker.y, x, y, br * .85);
+        walker.x = x; walker.y = y;
+        any = true;
+      } else walker = null;
+    } else if (touchedOnce) {
+      walker = null;
+    }
+
+    if (any || maskDirty) {
+      for (let i = 0; i < mask.length; i++) maskBytes[i] = mask[i] * 255 + .5 | 0;
+      gl.activeTexture(gl.TEXTURE0);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gw, gh, gl.LUMINANCE, gl.UNSIGNED_BYTE, maskBytes);
+      maskDirty = any;
+    }
+
+    // 淡入淡出
+    if (fadeT >= 0) {
+      fadeT += dt / FADE_S;
+      const k = Math.min(1, fadeT);
+      mixPos = mixFrom + (mixTo - mixFrom) * k * k * (3 - 2 * k);
+      if (k >= 1) { fadeT = -1; mixPos = mixTo; }
+    }
+
+    gl.uniform1f(U.u_time, ((now - t0) / 1000) % 1000);
+    gl.uniform1f(U.u_mix, mixPos);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- 設定面板 ----------
+  const $ = id => document.getElementById(id);
+  const gear = $('gear'), panel = $('panel');
+  const themesEl = $('themes');
+  Object.entries(THEMES).forEach(([key, t]) => {
+    const b = document.createElement('button');
+    b.dataset.theme = key;
+    b.innerHTML = `<i style="background:linear-gradient(90deg,${t.c[0]},${t.c[1]},${t.c[2]})"></i>${t.name}`;
+    b.addEventListener('click', () => { S.theme = key; saveSettings(); applyTheme(); syncUI(); redrawCurrent(); });
+    themesEl.appendChild(b);
+  });
+
+  function syncUI() {
+    $('optText').value = S.text;
+    $('optRange').value = S.range;
+    $('rangeVal').textContent = S.range + '%';
+    $('optSpeed').value = S.speed;
+    $('speedVal').textContent = `約 ${recoverSec()} 秒補回`;
+    $('optEmoji').checked = S.emoji;
+    $('optIdle').checked = S.idle;
+    themesEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.theme === S.theme));
+  }
+  function openPanel() { panel.hidden = false; gear.setAttribute('aria-expanded', 'true'); syncUI(); }
+  function closePanel() { panel.hidden = true; gear.setAttribute('aria-expanded', 'false'); }
+  gear.addEventListener('click', () => panel.hidden ? openPanel() : closePanel());
+  $('btnClose').addEventListener('click', closePanel);
+  panel.addEventListener('pointerdown', () => { lastInteract = performance.now(); });
+
+  let textTimer = 0;
+  $('optText').addEventListener('input', e => {
+    S.text = e.target.value; saveSettings();
+    clearTimeout(textTimer); textTimer = setTimeout(redrawCurrent, 250);
+  });
+  $('optRange').addEventListener('input', e => { S.range = +e.target.value; saveSettings(); syncUI(); });
+  $('optSpeed').addEventListener('input', e => { S.speed = +e.target.value; saveSettings(); syncUI(); });
+  $('optEmoji').addEventListener('change', e => { S.emoji = e.target.checked; saveSettings(); redrawCurrent(); });
+  $('optIdle').addEventListener('change', e => { S.idle = e.target.checked; saveSettings(); });
+  $('btnReset').addEventListener('click', () => {
+    S = Object.assign({}, DEFAULTS); saveSettings(); applyTheme(); syncUI(); redrawCurrent();
+  });
+
+  const note = $('note');
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  $('btnFs').addEventListener('click', () => {
+    const d = document, el = d.documentElement;
+    note.textContent = '';
+    try {
+      let p;
+      if (isFs()) p = (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      else if (el.requestFullscreen || el.webkitRequestFullscreen) p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      else { note.textContent = '這台裝置不支援全螢幕，請用瀏覽器的「加入主畫面」開啟。'; return; }
+      if (p && p.catch) p.catch(() => { note.textContent = '無法切換全螢幕。'; });
+    } catch (e) { note.textContent = '無法切換全螢幕。'; }
+  });
+  const syncFs = () => { $('btnFs').textContent = isFs() ? '離開全螢幕' : '全螢幕'; };
+  document.addEventListener('fullscreenchange', syncFs);
+  document.addEventListener('webkitfullscreenchange', syncFs);
+
+  // 加入主畫面用的 PNG 圖示（iOS 不吃 SVG）
+  try {
+    const ic = document.createElement('canvas'); ic.width = ic.height = 180;
+    const c = ic.getContext('2d');
+    c.fillStyle = '#1a0b2e'; c.fillRect(0, 0, 180, 180);
+    c.font = `130px ${EMOJI_FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.shadowColor = '#ff8a2a'; c.shadowBlur = 30;
+    c.fillText('🎃', 90, 98);
+    $('appleIcon').href = ic.toDataURL('image/png');
+  } catch (e) {}
+
+  // ---------- 啟動 ----------
+  applyTheme();
+  syncUI();
+  resize();
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('40px Michroma').then(redrawCurrent, () => {});
+  }
+  setInterval(shuffle, SHUFFLE_MS);
+  requestAnimationFrame(frame);
+
+  // 測試用的掛鉤
+  window.__wall = { get mask() { return mask; }, get mixPos() { return mixPos; }, shuffle, layers };
+})();
+</script>
+</body>
+</html>
